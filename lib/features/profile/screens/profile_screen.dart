@@ -28,7 +28,6 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
         title: const Text(
           'Mon Profil',
           style: TextStyle(
@@ -146,7 +145,7 @@ class ProfileScreen extends ConsumerWidget {
                 title: const Text('🔔 Son des alertes',
                     style: TextStyle(fontSize: 15)),
                 value: soundEnabled,
-                activeThumbColor: AppColors.primary,
+                activeColor: AppColors.primary,
                 onChanged: (v) =>
                     ref.read(_soundEnabledProvider.notifier).state = v,
               ),
@@ -159,7 +158,7 @@ class ProfileScreen extends ConsumerWidget {
                       fontSize: 12, color: AppColors.textSecondary),
                 ),
                 value: dataEconomy,
-                activeThumbColor: AppColors.primary,
+                activeColor: AppColors.primary,
                 onChanged: (v) =>
                     ref.read(_dataEconomyProvider.notifier).state = v,
               ),
@@ -306,7 +305,7 @@ class _ProfileHeader extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 40,
-            backgroundColor: AppColors.primary,
+            backgroundColor: AppColors.ctaGreen,
             child: Text(
               initials,
               style: const TextStyle(
@@ -368,11 +367,11 @@ class _BadgeChip extends StatelessWidget {
 
     if (trips >= 100 && rating > 4.5) {
       label = '⭐ Premium';
-      bgColor = AppColors.secondary;
+      bgColor = AppColors.gold;
       textColor = Colors.black;
     } else if (trips >= 21) {
       label = '✅ Confirmé';
-      bgColor = AppColors.navBlue;
+      bgColor = AppColors.ctaGreen;
       textColor = Colors.white;
     } else {
       label = '🆕 Nouveau';

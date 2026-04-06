@@ -351,7 +351,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
         Polyline(
           polylineId: const PolylineId('route'),
           points: [riderPos, destinationPos],
-          color: const Color(0xFF1B4332),
+          color: AppColors.ctaGreen,
           width: 5,
         ),
     };
@@ -457,7 +457,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
 
   Widget _buildGpsBanner() {
     return Container(
-      color: const Color(0xFFFFD600),
+      color: AppColors.warning,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: const Row(
         children: [
@@ -576,7 +576,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF8E1),
+              color: AppColors.warning.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -698,7 +698,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFEBEE),
+              color: AppColors.accent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -716,16 +716,17 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
+              color: AppColors.ctaGreen.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Text(
               '✅ Déjà payé par Mobile Money',
               textAlign: TextAlign.center,
               style: TextStyle(
+                fontFamily: 'NunitoSans',
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: AppColors.primary,
+                color: AppColors.ctaGreen,
               ),
             ),
           ),
@@ -733,7 +734,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
         SwipeButton(
           key: ValueKey(_swipeResetKey),
           label: 'COMMANDE LIVRÉE ✅ →',
-          color: AppColors.secondary,
+          color: AppColors.gold,
           enabled: !_isUpdatingStatus,
           onConfirmed: _completeDelivery,
         ),
@@ -745,7 +746,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
 
   Widget _buildSuccessOverlay(CourseModel course) {
     return Container(
-      color: AppColors.primary,
+      color: AppColors.primary, // Nyama Orange
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -755,6 +756,7 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
             const Text(
               'Bien joué !',
               style: TextStyle(
+                fontFamily: 'Montserrat',
                 fontSize: 28,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
@@ -764,9 +766,10 @@ class _NavigationScreenState extends ConsumerState<NavigationScreen> {
             Text(
               '+${course.deliveryFeeXaf.toFcfa()}',
               style: const TextStyle(
+                fontFamily: 'SpaceMono',
                 fontSize: 32,
-                fontWeight: FontWeight.w900,
-                color: AppColors.secondary,
+                fontWeight: FontWeight.w700,
+                color: AppColors.gold,
               ),
             ),
           ],

@@ -13,7 +13,7 @@ class SwipeButton extends StatefulWidget {
     super.key,
     required this.label,
     required this.onConfirmed,
-    this.color = AppColors.primary,
+    this.color = AppColors.ctaGreen,
     this.enabled = true,
   });
 

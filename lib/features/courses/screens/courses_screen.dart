@@ -201,7 +201,7 @@ class _TopBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.primary,
+      color: AppColors.primary, // Nyama Orange
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
@@ -211,6 +211,7 @@ class _TopBanner extends StatelessWidget {
           const Text(
             'NYAMA Rider',
             style: TextStyle(
+              fontFamily: 'Montserrat',
               color: Colors.white,
               fontSize: 20,
               fontWeight: FontWeight.w900,
@@ -227,6 +228,7 @@ class _TopBanner extends StatelessWidget {
             child: const Text(
               'En ligne 🟢',
               style: TextStyle(
+                  fontFamily: 'NunitoSans',
                   color: Colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w600),

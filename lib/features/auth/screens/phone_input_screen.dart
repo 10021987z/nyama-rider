@@ -60,6 +60,7 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
                 const Text(
                   'NYAMA Rider',
                   style: TextStyle(
+                    fontFamily: 'Montserrat',
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                     color: AppColors.primary,

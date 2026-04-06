@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../providers/auth_provider.dart';
@@ -55,28 +56,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: AppColors.primary, // Fond #F57C20
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ScaleTransition(
               scale: _scale,
-              child: Container(
+              child: SvgPicture.asset(
+                'assets/nyama-logo.svg',
                 width: 120,
                 height: 120,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                alignment: Alignment.center,
-                child: const Text('🏍️', style: TextStyle(fontSize: 64)),
               ),
             ),
             const SizedBox(height: 24),
             const Text(
               'NYAMA Rider',
               style: TextStyle(
+                fontFamily: 'Montserrat',
                 color: Colors.white,
                 fontSize: 32,
                 fontWeight: FontWeight.w900,
@@ -84,9 +81,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Livrez. Gagnez. Roulez.',
-              style: TextStyle(color: Colors.white60, fontSize: 16),
+              style: TextStyle(
+                fontFamily: 'NunitoSans',
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 16,
+              ),
             ),
           ],
         ),

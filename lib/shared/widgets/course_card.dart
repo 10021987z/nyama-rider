@@ -109,9 +109,10 @@ class _CourseCardState extends ConsumerState<CourseCard> {
                 Text(
                   course.deliveryFeeXaf.toFcfa(),
                   style: const TextStyle(
+                    fontFamily: 'SpaceMono',
                     fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.success,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.gold,
                   ),
                 ),
                 const SizedBox(height: 10),

@@ -72,7 +72,6 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
         title: const Text(
           'Mes Gains',
           style: TextStyle(
@@ -170,7 +169,7 @@ class _BalanceCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8F5E9),
+        color: AppColors.gold.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -178,15 +177,16 @@ class _BalanceCard extends StatelessWidget {
         children: [
           const Text(
             'Solde disponible',
-            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            style: TextStyle(fontFamily: 'NunitoSans', fontSize: 14, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 6),
           Text(
             earnings.total.toFcfa(),
             style: const TextStyle(
+              fontFamily: 'SpaceMono',
               fontSize: 32,
-              fontWeight: FontWeight.w900,
-              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+              color: AppColors.gold,
             ),
           ),
           const SizedBox(height: 16),
@@ -196,12 +196,13 @@ class _BalanceCard extends StatelessWidget {
             child: ElevatedButton(
               onPressed: onTransfer,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.secondary,
+                backgroundColor: AppColors.gold,
                 foregroundColor: Colors.black,
               ),
               child: const Text(
                 '💸 Transférer mes gains',
                 style: TextStyle(
+                    fontFamily: 'Montserrat',
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: Colors.black),
@@ -249,9 +250,10 @@ class _PeriodCard extends StatelessWidget {
                 Text(
                   earnings.total.toFcfa(),
                   style: const TextStyle(
+                    fontFamily: 'SpaceMono',
                     fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.gold,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -336,7 +338,7 @@ class _PeriodChip extends ConsumerWidget {
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      selectedColor: AppColors.primary,
+      selectedColor: AppColors.primary, // Nyama Orange
       labelStyle: TextStyle(
         color: selected ? Colors.white : AppColors.textPrimary,
         fontWeight: FontWeight.w600,
@@ -409,9 +411,10 @@ class _EntryRow extends StatelessWidget {
           Text(
             '+${entry.netXaf.toFcfa()}',
             style: const TextStyle(
+              fontFamily: 'SpaceMono',
               fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+              color: AppColors.gold,
             ),
           ),
         ],
@@ -444,29 +447,31 @@ class _WeekMonthSummary extends StatelessWidget {
           Text(
             earnings.total.toFcfa(),
             style: const TextStyle(
+              fontFamily: 'SpaceMono',
               fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+              color: AppColors.gold,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             '${earnings.count} course${earnings.count > 1 ? 's' : ''} effectuée${earnings.count > 1 ? 's' : ''}',
             style: const TextStyle(
-                fontSize: 14, color: AppColors.textSecondary),
+                fontFamily: 'NunitoSans', fontSize: 14, color: AppColors.textSecondary),
           ),
           const Divider(height: 24),
           Text(
             'Gain moyen par course',
             style: const TextStyle(
-                fontSize: 13, color: AppColors.textSecondary),
+                fontFamily: 'NunitoSans', fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 4),
           Text(
             earnings.avgPerDelivery.toFcfa(),
             style: const TextStyle(
+              fontFamily: 'SpaceMono',
               fontSize: 20,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),
           ),
@@ -708,7 +713,7 @@ class _TransferSheetState extends State<_TransferSheet> {
             decoration: const InputDecoration(
               labelText: 'Opérateur',
               filled: true,
-              fillColor: Color(0xFFF5F5F5),
+              fillColor: AppColors.surface,
             ),
             child: Text(
               _operatorLabel,
@@ -724,7 +729,7 @@ class _TransferSheetState extends State<_TransferSheet> {
               decoration: const InputDecoration(
                 labelText: 'Numéro',
                 filled: true,
-                fillColor: Color(0xFFF5F5F5),
+                fillColor: AppColors.surface,
               ),
               child: Text(
                 _maskPhone(profile!.momoPhone!),
@@ -787,9 +792,9 @@ class _TransferSheetState extends State<_TransferSheet> {
                   ? null
                   : _doTransfer,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.secondary,
+                backgroundColor: AppColors.gold,
                 disabledBackgroundColor:
-                    AppColors.secondary.withValues(alpha: 0.5),
+                    AppColors.gold.withValues(alpha: 0.5),
                 foregroundColor: Colors.black,
               ),
               child: _isTransferring
