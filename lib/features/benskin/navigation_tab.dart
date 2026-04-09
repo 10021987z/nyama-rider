@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
+import '../sos/sos_screen.dart';
 
 class NavigationTab extends StatefulWidget {
   final bool hasActiveMission;
@@ -77,6 +78,11 @@ class _NavigationTabState extends State<NavigationTab>
         ),
         centerTitle: true,
       ),
+      floatingActionButton: const Padding(
+        padding: EdgeInsets.only(bottom: 8),
+        child: SosButton(),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Stack(
         children: [
           widget.hasActiveMission ? _activeMission(context) : _noMission(),

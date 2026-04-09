@@ -42,5 +42,9 @@ class SecureStorage {
       _storage.write(key: 'fcm_token', value: t);
   static Future<String?> getFcmToken() => _storage.read(key: 'fcm_token');
 
+  static Future<void> writeRaw(String key, String value) =>
+      _storage.write(key: key, value: value);
+  static Future<String?> readRaw(String key) => _storage.read(key: key);
+
   static Future<void> clearAll() => _storage.deleteAll();
 }
