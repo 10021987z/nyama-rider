@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 
@@ -20,6 +21,25 @@ class _ProfileTabState extends State<ProfileTab> {
       final x = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (x != null) setState(() => _avatar = File(x.path));
     } catch (_) {}
+  }
+
+  Future<void> _scanDocument(String label) async {
+    try {
+      final x = await ImagePicker().pickImage(source: ImageSource.camera);
+      if (x != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('$label enregistré ✓'),
+              backgroundColor: AppColors.ctaGreen),
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _inviteFriend() async {
+    await Share.share(
+      "Viens livrer avec Benskin Express ! Télécharge l'app et inscris-toi avec mon code RIDER_KEVIN_237 pour un bonus de bienvenue.",
+    );
   }
 
   @override
@@ -116,6 +136,46 @@ class _ProfileTabState extends State<ProfileTab> {
             ],
           ),
           const SizedBox(height: 20),
+          const Text('Statistiques de la semaine',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0x14000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 2)),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: const [
+                _Gauge(
+                  value: 0.95,
+                  label: 'Acceptation',
+                  display: '95%',
+                  color: AppColors.ctaGreen,
+                ),
+                _Gauge(
+                  value: 0.73,
+                  label: 'Temps moyen',
+                  display: '22 min',
+                  color: AppColors.primary,
+                ),
+                _Gauge(
+                  value: 0.98,
+                  label: 'Satisfaction',
+                  display: '4.9/5',
+                  color: AppColors.gold,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           const Text('Véhicule de service',
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
           const SizedBox(height: 10),
@@ -182,7 +242,48 @@ class _ProfileTabState extends State<ProfileTab> {
               ],
             ),
           ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _scanDocument('Permis'),
+                  icon: const Icon(Icons.document_scanner,
+                      color: AppColors.primary),
+                  label: const Text('Permis',
+                      style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _scanDocument('Assurance'),
+                  icon: const Icon(Icons.document_scanner,
+                      color: AppColors.primary),
+                  label: const Text('Assurance',
+                      style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
+          _menuItem(Icons.person_add, 'Inviter un ami livreur', _inviteFriend),
           _menuItem(Icons.history, 'Historique complet',
               () => _snack(context, 'Historique bientôt disponible')),
           _menuItem(Icons.two_wheeler, 'Paramètres du véhicule',
@@ -230,6 +331,55 @@ class _ProfileTabState extends State<ProfileTab> {
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
+    );
+  }
+}
+
+class _Gauge extends StatelessWidget {
+  final double value;
+  final String label;
+  final String display;
+  final Color color;
+  const _Gauge({
+    required this.value,
+    required this.label,
+    required this.display,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          width: 72,
+          height: 72,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 72,
+                height: 72,
+                child: CircularProgressIndicator(
+                  value: value,
+                  strokeWidth: 7,
+                  backgroundColor: Colors.grey.shade200,
+                  valueColor: AlwaysStoppedAnimation(color),
+                ),
+              ),
+              Text(display,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 13)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary)),
+      ],
     );
   }
 }
