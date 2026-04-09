@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'core/constants/app_colors.dart';
@@ -89,14 +90,32 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   late int _currentIndex;
+  late final PageController _pageCtrl;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _pageCtrl = PageController(initialPage: _currentIndex);
   }
 
-  void _goMissions() => setState(() => _currentIndex = 0);
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  void _goToTab(int i) {
+    HapticFeedback.selectionClick();
+    setState(() => _currentIndex = i);
+    _pageCtrl.animateToPage(
+      i,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOutCubic,
+    );
+  }
+
+  void _goMissions() => _goToTab(0);
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +130,12 @@ class _MainShellState extends State<MainShell> {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          IndexedStack(index: _currentIndex, children: screens),
+          PageView(
+            controller: _pageCtrl,
+            physics: const BouncingScrollPhysics(),
+            onPageChanged: (i) => setState(() => _currentIndex = i),
+            children: screens,
+          ),
           ValueListenableBuilder<bool>(
             valueListenable: offlineNotifier,
             builder: (_, isOffline, __) {
@@ -143,7 +167,7 @@ class _MainShellState extends State<MainShell> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
+        onTap: _goToTab,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: AppColors.primary,
         unselectedItemColor: AppColors.textSecondary,
