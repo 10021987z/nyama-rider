@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../sos/sos_screen.dart';
+import '../sos/sos_service.dart';
 
 class NavigationTab extends StatefulWidget {
   final bool hasActiveMission;
@@ -62,6 +65,16 @@ class _NavigationTabState extends State<NavigationTab>
     if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
+  Future<void> _triggerSos() async {
+    final ok = await confirmSos(context);
+    if (!ok || !mounted) return;
+    final alert = await SosService.instance.trigger();
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => SosSentScreen(alert: alert)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,11 +91,6 @@ class _NavigationTabState extends State<NavigationTab>
         ),
         centerTitle: true,
       ),
-      floatingActionButton: const Padding(
-        padding: EdgeInsets.only(bottom: 8),
-        child: SosButton(),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Stack(
         children: [
           widget.hasActiveMission ? _activeMission(context) : _noMission(),
@@ -148,84 +156,8 @@ class _NavigationTabState extends State<NavigationTab>
     return Column(
       children: [
         Expanded(
-          flex: 5,
-          child: Stack(
-            children: [
-              Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
-                  ),
-                ),
-                child: const Center(
-                  child:
-                      Icon(Icons.map, size: 120, color: AppColors.ctaGreen),
-                ),
-              ),
-              Positioned(
-                top: 12,
-                left: 12,
-                right: 12,
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.turn_right,
-                          color: Colors.white, size: 32),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('DANS 250 MÈTRES',
-                                style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.6)),
-                            const SizedBox(height: 2),
-                            const Text(
-                              'Tournez à droite sur Rue Pau',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 18),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 16,
-                bottom: 16,
-                child: Column(
-                  children: [
-                    _callFab(
-                      icon: Icons.restaurant,
-                      color: AppColors.primary,
-                      onTap: () => _call(_restaurantPhone),
-                    ),
-                    const SizedBox(height: 10),
-                    _callFab(
-                      icon: Icons.person,
-                      color: AppColors.secondary,
-                      onTap: () => _call(_clientPhone),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          flex: 6,
+          child: _WazeMap(pulseCtrl: _pulseCtrl, onCallRestaurant: () => _call(_restaurantPhone), onCallClient: () => _call(_clientPhone)),
         ),
         Container(
           padding: const EdgeInsets.all(16),
@@ -279,7 +211,7 @@ class _NavigationTabState extends State<NavigationTab>
               const SizedBox(height: 14),
               _clientCard(),
               const SizedBox(height: 12),
-              _mainActionButton(),
+              _actionRow(),
             ],
           ),
         ),
@@ -287,28 +219,45 @@ class _NavigationTabState extends State<NavigationTab>
     );
   }
 
-  Widget _callFab({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color,
-          boxShadow: const [
-            BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 10,
-                offset: Offset(0, 3)),
-          ],
+  Widget _actionRow() {
+    return Row(
+      children: [
+        // Bouton SOS
+        GestureDetector(
+          onTap: _triggerSos,
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8413C),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFE8413C).withValues(alpha: 0.35),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.white, size: 26),
+                Text('SOS',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                      letterSpacing: 1,
+                    )),
+              ],
+            ),
+          ),
         ),
-        child: Icon(icon, color: Colors.white, size: 26),
-      ),
+        const SizedBox(width: 12),
+        Expanded(child: _mainActionButton()),
+      ],
     );
   }
 
@@ -367,7 +316,6 @@ class _NavigationTabState extends State<NavigationTab>
   Widget _mainActionButton() {
     if (_step >= 3) {
       return SizedBox(
-        width: double.infinity,
         height: 72,
         child: Container(
           decoration: BoxDecoration(
@@ -379,7 +327,7 @@ class _NavigationTabState extends State<NavigationTab>
                 style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
-                    fontSize: 20,
+                    fontSize: 18,
                     letterSpacing: 1)),
           ),
         ),
@@ -407,7 +355,6 @@ class _NavigationTabState extends State<NavigationTab>
     };
 
     return SizedBox(
-      width: double.infinity,
       height: 72,
       child: Material(
         color: Colors.transparent,
@@ -426,7 +373,7 @@ class _NavigationTabState extends State<NavigationTab>
               style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
-                  fontSize: 20,
+                  fontSize: 18,
                   letterSpacing: 1),
             ),
           ),
@@ -499,4 +446,308 @@ class _NavigationTabState extends State<NavigationTab>
       }),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Carte style Waze (rendu simulé, pas d'intégration Google Maps ici)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _WazeMap extends StatelessWidget {
+  final AnimationController pulseCtrl;
+  final VoidCallback onCallRestaurant;
+  final VoidCallback onCallClient;
+  const _WazeMap({
+    required this.pulseCtrl,
+    required this.onCallRestaurant,
+    required this.onCallClient,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Fond radial
+        Container(
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(
+              radius: 1.1,
+              colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
+            ),
+          ),
+        ),
+        // Quadrillage de rues
+        Positioned.fill(
+          child: CustomPaint(painter: _StreetGridPainter()),
+        ),
+        // Itinéraire en pointillés orange
+        Positioned.fill(
+          child: CustomPaint(painter: _RoutePainter()),
+        ),
+        // Marqueur restaurant (haut droite)
+        const Positioned(
+          top: 60,
+          right: 40,
+          child: _MapMarker(
+            color: AppColors.primary,
+            icon: Icons.restaurant,
+          ),
+        ),
+        // Marqueur client (haut gauche)
+        const Positioned(
+          top: 90,
+          left: 50,
+          child: _MapMarker(
+            color: AppColors.ctaGreen,
+            icon: Icons.home,
+          ),
+        ),
+        // Position livreur pulsante (centre bas)
+        Positioned(
+          bottom: 90,
+          left: 80,
+          child: AnimatedBuilder(
+            animation: pulseCtrl,
+            builder: (context, _) {
+              return Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 40 * (0.7 + 0.3 * pulseCtrl.value),
+                      height: 40 * (0.7 + 0.3 * pulseCtrl.value),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.blue
+                            .withValues(alpha: 0.25 * (1 - pulseCtrl.value)),
+                      ),
+                    ),
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.blue,
+                        border: Border.all(color: Colors.white, width: 3),
+                        boxShadow: const [
+                          BoxShadow(
+                              color: Color(0x33000000),
+                              blurRadius: 4,
+                              offset: Offset(0, 2)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        // Card instruction navigation
+        Positioned(
+          top: 12,
+          left: 12,
+          right: 12,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3D3D3D),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 3)),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.turn_right,
+                      color: Colors.white, size: 26),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('DANS 250 MÈTRES',
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.8),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.6)),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Tournez à droite sur Rue Pau',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Badge distance / temps (bas gauche)
+        Positioned(
+          bottom: 12,
+          left: 12,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0x22000000),
+                    blurRadius: 6,
+                    offset: Offset(0, 2)),
+              ],
+            ),
+            child: const Text(
+              '3.2 km • 12 min',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+            ),
+          ),
+        ),
+        // FABs d'appel
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: Column(
+            children: [
+              _callFab(
+                  icon: Icons.restaurant,
+                  color: AppColors.primary,
+                  onTap: onCallRestaurant),
+              const SizedBox(height: 10),
+              _callFab(
+                  icon: Icons.person,
+                  color: AppColors.secondary,
+                  onTap: onCallClient),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _callFab({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color,
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x33000000),
+                blurRadius: 10,
+                offset: Offset(0, 3)),
+          ],
+        ),
+        child: Icon(icon, color: Colors.white, size: 24),
+      ),
+    );
+  }
+}
+
+class _MapMarker extends StatelessWidget {
+  final Color color;
+  final IconData icon;
+  const _MapMarker({required this.color, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x44000000),
+              blurRadius: 6,
+              offset: Offset(0, 2)),
+        ],
+      ),
+      child: Icon(icon, color: Colors.white, size: 18),
+    );
+  }
+}
+
+class _StreetGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFBDBDBD).withValues(alpha: 0.6)
+      ..strokeWidth = 2;
+
+    // Lignes horizontales
+    const hSpacing = 60.0;
+    for (double y = hSpacing; y < size.height; y += hSpacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+    // Lignes verticales
+    const vSpacing = 70.0;
+    for (double x = vSpacing; x < size.width; x += vSpacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _RoutePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.primary
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+
+    // Diagonale bas-gauche → haut-droite, en pointillés
+    final start = Offset(40, size.height - 80);
+    final end = Offset(size.width - 50, 80);
+    const dashLen = 14.0;
+    const gap = 8.0;
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    final mag = math.sqrt(dx * dx + dy * dy);
+    if (mag == 0) return;
+    final ux = dx / mag;
+    final uy = dy / mag;
+    double traveled = 0;
+    while (traveled < mag) {
+      final p1 = Offset(start.dx + ux * traveled, start.dy + uy * traveled);
+      final nextLen = math.min(traveled + dashLen, mag);
+      final p2 = Offset(start.dx + ux * nextLen, start.dy + uy * nextLen);
+      canvas.drawLine(p1, p2, paint);
+      traveled += dashLen + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

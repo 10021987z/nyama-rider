@@ -461,7 +461,7 @@ class _RevenueTabState extends State<RevenueTab> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _providerChip(
-                        label: 'Falla MoMo',
+                        label: 'Falla Mobile Money',
                         color: const Color(0xFF1B4332),
                         selected: provider == 'FALLA',
                         onTap: () => setState(() => provider = 'FALLA'),

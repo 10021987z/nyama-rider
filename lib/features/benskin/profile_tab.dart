@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
+import 'vehicle_settings_sheet.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -287,7 +288,7 @@ class _ProfileTabState extends State<ProfileTab> {
           _menuItem(Icons.history, 'Historique complet',
               () => _snack(context, 'Historique bientôt disponible')),
           _menuItem(Icons.two_wheeler, 'Paramètres du véhicule',
-              () => _snack(context, 'Paramètres véhicule bientôt')),
+              () => showVehicleSettingsSheet(context)),
           _menuItem(Icons.help_outline, 'Aide & Support', () async {
             final uri = Uri.parse('https://wa.me/237699000000');
             if (await canLaunchUrl(uri)) {

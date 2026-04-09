@@ -527,6 +527,9 @@ class _MissionCardState extends State<_MissionCard>
 
   late final AnimationController _glowCtrl;
   late final AnimationController _appearCtrl;
+  late final AnimationController _acceptCtrl;
+  late final AnimationController _flashCtrl;
+  bool _accepted = false;
 
   @override
   void initState() {
@@ -539,6 +542,14 @@ class _MissionCardState extends State<_MissionCard>
       vsync: this,
       duration: const Duration(milliseconds: 450),
     );
+    _acceptCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _flashCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
     Future.delayed(Duration(milliseconds: 100 * widget.index), () {
       if (mounted) _appearCtrl.forward();
     });
@@ -548,7 +559,36 @@ class _MissionCardState extends State<_MissionCard>
   void dispose() {
     _glowCtrl.dispose();
     _appearCtrl.dispose();
+    _acceptCtrl.dispose();
+    _flashCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _onAccept(BuildContext context) async {
+    if (_accepted) return;
+    setState(() => _accepted = true);
+    // Vibration pattern : 3 × heavyImpact avec 100ms d'intervalle
+    HapticFeedback.heavyImpact();
+    await Future.delayed(const Duration(milliseconds: 100));
+    HapticFeedback.heavyImpact();
+    await Future.delayed(const Duration(milliseconds: 100));
+    HapticFeedback.heavyImpact();
+    SystemSound.play(SystemSoundType.click);
+    // Flash vert
+    _flashCtrl.forward();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.ctaGreen,
+          content: Text('Mission acceptée !',
+              style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
+      );
+    }
+    widget.onAccepted?.call();
+    // Compression + fade
+    await Future.delayed(const Duration(milliseconds: 200));
+    _acceptCtrl.forward();
   }
 
   String _etaString(int minutes) {
@@ -569,36 +609,57 @@ class _MissionCardState extends State<_MissionCard>
 
     final isExpress = m.type == 'express';
     return AnimatedBuilder(
-      animation: Listenable.merge([_glowCtrl, _appearCtrl]),
+      animation: Listenable.merge(
+          [_glowCtrl, _appearCtrl, _acceptCtrl, _flashCtrl]),
       builder: (context, child) {
         final appear = Curves.easeOutCubic.transform(_appearCtrl.value);
         final glow = isExpress ? 0.25 + 0.45 * _glowCtrl.value : 0.0;
+        final accept = Curves.easeInCubic.transform(_acceptCtrl.value);
         return Opacity(
-          opacity: appear,
+          opacity: appear * (1 - accept),
           child: Transform.translate(
-            offset: Offset(0, 24 * (1 - appear)),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: isExpress
-                    ? Border.all(color: AppColors.primary, width: 2)
-                    : null,
-                boxShadow: [
-                  const BoxShadow(
-                      color: Color(0x14000000),
-                      blurRadius: 10,
-                      offset: Offset(0, 3)),
-                  if (isExpress)
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: glow),
-                      blurRadius: 22,
-                      spreadRadius: 2,
+            offset: Offset(
+                0, 24 * (1 - appear) + (-80 * accept)),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: isExpress
+                          ? Border.all(color: AppColors.primary, width: 2)
+                          : null,
+                      boxShadow: [
+                        const BoxShadow(
+                            color: Color(0x14000000),
+                            blurRadius: 10,
+                            offset: Offset(0, 3)),
+                        if (isExpress)
+                          BoxShadow(
+                            color:
+                                AppColors.primary.withValues(alpha: glow),
+                            blurRadius: 22,
+                            spreadRadius: 2,
+                          ),
+                      ],
+                    ),
+                    child: child,
+                  ),
+                  // Flash vert à l'acceptation
+                  if (_flashCtrl.value > 0)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Container(
+                          color: AppColors.ctaGreen.withValues(
+                              alpha: 0.3 * (1 - _flashCtrl.value)),
+                        ),
+                      ),
                     ),
                 ],
               ),
-              child: child,
             ),
           ),
         );
@@ -695,41 +756,55 @@ class _MissionCardState extends State<_MissionCard>
           const SizedBox(height: 14),
           LayoutBuilder(builder: (context, c) {
             final maxDrag = c.maxWidth - _handle - 8;
+            final progress = maxDrag <= 0 ? 0.0 : (_drag / maxDrag).clamp(0.0, 1.0);
             return GestureDetector(
               onHorizontalDragUpdate: (d) {
+                if (_accepted) return;
                 setState(() {
                   _drag = (_drag + d.delta.dx).clamp(0, maxDrag);
                 });
               },
               onHorizontalDragEnd: (_) {
+                if (_accepted) return;
                 if (_drag > maxDrag * 0.85) {
-                  HapticFeedback.heavyImpact();
-                  SystemSound.play(SystemSoundType.click);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: AppColors.ctaGreen,
-                      content: Text('Mission acceptée — ${m.restaurant}'),
-                    ),
-                  );
-                  widget.onAccepted?.call();
+                  _onAccept(context);
+                } else {
+                  setState(() => _drag = 0);
                 }
-                setState(() => _drag = 0);
               },
               child: Container(
                 height: _trackHeight,
                 decoration: BoxDecoration(
-                  color: AppColors.ctaGreen.withValues(alpha: 0.2),
+                  color: AppColors.ctaGreen
+                      .withValues(alpha: 0.2 + 0.6 * progress),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Stack(
                   children: [
-                    const Center(
-                      child: Text(
-                        'Glisser pour accepter',
-                        style: TextStyle(
-                            color: AppColors.ctaGreen,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16),
+                    // Traînée orange derrière la poignée
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 4 + _drag + _handle / 2,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.primary
+                              .withValues(alpha: 0.35 + 0.3 * progress),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Opacity(
+                        opacity: (1 - progress * 1.3).clamp(0.0, 1.0),
+                        child: const Text(
+                          'Glisser pour accepter',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16),
+                        ),
                       ),
                     ),
                     Positioned(
