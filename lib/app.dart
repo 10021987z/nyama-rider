@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'core/constants/app_colors.dart';
 import 'core/network/api_client.dart';
@@ -6,11 +7,10 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/phone_input_screen.dart';
 import 'features/auth/screens/otp_verification_screen.dart';
-import 'features/courses/screens/courses_screen.dart';
-import 'features/courses/data/models/course_model.dart';
-import 'features/navigation/screens/navigation_screen.dart';
-import 'features/earnings/screens/earnings_screen.dart';
-import 'features/profile/screens/profile_screen.dart';
+import 'features/benskin/missions_tab.dart';
+import 'features/benskin/navigation_tab.dart';
+import 'features/benskin/revenue_tab.dart';
+import 'features/benskin/profile_tab.dart';
 
 class App extends StatelessWidget {
   App({super.key});
@@ -19,54 +19,34 @@ class App extends StatelessWidget {
     initialLocation: '/splash',
     debugLogDiagnostics: false,
     routes: [
-      GoRoute(
-        path: '/splash',
-        builder: (context, state) => const SplashScreen(),
-      ),
-      GoRoute(
-        path: '/phone',
-        builder: (context, state) => const PhoneInputScreen(),
-      ),
+      GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
+      GoRoute(path: '/login', builder: (_, __) => const PhoneInputScreen()),
+      GoRoute(path: '/phone', builder: (_, __) => const PhoneInputScreen()),
       GoRoute(
         path: '/otp',
-        builder: (context, state) {
-          final phone = state.extra as String? ?? '';
-          return OtpVerificationScreen(phone: phone);
-        },
+        builder: (_, state) =>
+            OtpVerificationScreen(phone: state.extra as String? ?? ''),
       ),
+      GoRoute(path: '/home', builder: (_, __) => const MainShell()),
       GoRoute(
-        path: '/courses',
-        builder: (context, state) => const MainShell(initialIndex: 0),
-      ),
+          path: '/courses',
+          builder: (_, __) => const MainShell(initialIndex: 0)),
       GoRoute(
-        path: '/earnings',
-        builder: (context, state) => const MainShell(initialIndex: 1),
-      ),
+          path: '/earnings',
+          builder: (_, __) => const MainShell(initialIndex: 2)),
       GoRoute(
-        path: '/profile',
-        builder: (context, state) => const MainShell(initialIndex: 2),
-      ),
-      GoRoute(
-        path: '/navigation/:orderId',
-        builder: (context, state) => NavigationScreen(
-          orderId: state.pathParameters['orderId']!,
-          initialCourse: state.extra as CourseModel?,
-        ),
-      ),
+          path: '/profile',
+          builder: (_, __) => const MainShell(initialIndex: 3)),
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('🗺️', style: TextStyle(fontSize: 64)),
-            const SizedBox(height: 16),
             const Text('Page introuvable'),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => context.go('/courses'),
-              style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(200, 56)),
+              onPressed: () => context.go('/home'),
               child: const Text('Accueil'),
             ),
           ],
@@ -78,20 +58,26 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'NYAMA Rider',
+      title: 'Benskin Express',
       theme: AppTheme.light,
       routerConfig: _router,
       debugShowCheckedModeBanner: false,
       locale: const Locale('fr', 'CM'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       supportedLocales: const [
         Locale('fr', 'CM'),
         Locale('fr', 'FR'),
+        Locale('en'),
       ],
     );
   }
 }
 
-// ── Shell principal — 3 onglets ───────────────────────────────────────────────
+// ── Shell 4 tabs ─────────────────────────────────────────────────────────────
 
 class MainShell extends StatefulWidget {
   final int initialIndex;
@@ -104,32 +90,31 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   late int _currentIndex;
 
-  static const _screens = [
-    CoursesScreen(),
-    EarningsScreen(),
-    ProfileScreen(),
-  ];
-
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
   }
 
+  void _goMissions() => setState(() => _currentIndex = 0);
+
   @override
   Widget build(BuildContext context) {
+    final screens = <Widget>[
+      const MissionsTab(),
+      NavigationTab(hasActiveMission: true, onGoToMissions: _goMissions),
+      const RevenueTab(),
+      const ProfileTab(),
+    ];
+
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          IndexedStack(
-            index: _currentIndex,
-            children: _screens,
-          ),
-
-          // ── Offline banner ─────────────────────────────────────────────
+          IndexedStack(index: _currentIndex, children: screens),
           ValueListenableBuilder<bool>(
             valueListenable: offlineNotifier,
-            builder: (_, isOffline, _) {
+            builder: (_, isOffline, __) {
               if (!isOffline) return const SizedBox.shrink();
               return Positioned(
                 top: 0,
@@ -138,15 +123,15 @@ class _MainShellState extends State<MainShell> {
                 child: SafeArea(
                   bottom: false,
                   child: Container(
-                    color: AppColors.error,
-                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     alignment: Alignment.center,
                     child: const Text(
-                      '📡 Hors connexion',
+                      'Mode hors-ligne — Le GPS fonctionne toujours',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
+                        color: AppColors.primary,
                         fontWeight: FontWeight.w700,
+                        fontSize: 13,
                       ),
                     ),
                   ),
@@ -159,24 +144,81 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (i) => setState(() => _currentIndex = i),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textSecondary,
+        selectedLabelStyle:
+            const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.motorcycle_outlined, size: 28),
-            activeIcon: Icon(Icons.motorcycle, size: 28),
-            label: 'Courses',
-          ),
+              icon: Icon(Icons.restaurant_menu, size: 28), label: 'Missions'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.account_balance_wallet_outlined, size: 28),
-            activeIcon: Icon(Icons.account_balance_wallet, size: 28),
-            label: 'Gains',
-          ),
+              icon: Icon(Icons.directions, size: 28), label: 'Navigation'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline, size: 28),
-            activeIcon: Icon(Icons.person, size: 28),
-            label: 'Profil',
-          ),
+              icon: Icon(Icons.payments, size: 28), label: 'Revenus'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.person, size: 28), label: 'Profil'),
         ],
       ),
     );
   }
+}
+
+// Mission complete overlay helper — can be shown from anywhere.
+Future<void> showMissionCompleteOverlay(BuildContext context,
+    {int gain = 1250}) async {
+  await showDialog<void>(
+    context: context,
+    barrierColor: Colors.black54,
+    builder: (ctx) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFF8E1), Colors.white],
+          ),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, size: 80, color: AppColors.ctaGreen),
+            const SizedBox(height: 14),
+            Text(
+              '+$gain FCFA',
+              style: const TextStyle(
+                fontFamily: 'SpaceMono',
+                fontSize: 36,
+                fontWeight: FontWeight.w700,
+                color: AppColors.gold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text('Bien joué Kevin !',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 24)),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 64,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.ctaGreen,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14))),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Prochaine mission',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
