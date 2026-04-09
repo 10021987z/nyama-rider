@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/constants/app_colors.dart';
 
@@ -61,8 +62,26 @@ class MissionsTab extends StatefulWidget {
   State<MissionsTab> createState() => _MissionsTabState();
 }
 
-class _MissionsTabState extends State<MissionsTab> {
+class _MissionsTabState extends State<MissionsTab>
+    with TickerProviderStateMixin {
   bool _online = true;
+  int _todayEarnings = 8450;
+  late final AnimationController _pulseCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,9 +97,7 @@ class _MissionsTabState extends State<MissionsTab> {
             const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(
-                    child: _statCard("AUJOURD'HUI", '8 450 FCFA',
-                        isMoney: true)),
+                Expanded(child: _earningsCard(_todayEarnings)),
                 const SizedBox(width: 12),
                 Expanded(child: _statCard('MISSIONS', '12')),
               ],
@@ -106,9 +123,15 @@ class _MissionsTabState extends State<MissionsTab> {
             if (!_online)
               _idleState()
             else
-              ..._missions.map((m) => Padding(
+              ..._missions.asMap().entries.map((e) => Padding(
                     padding: const EdgeInsets.only(bottom: 14),
-                    child: _MissionCard(mission: m),
+                    child: _MissionCard(
+                      mission: e.value,
+                      index: e.key,
+                      onAccepted: () {
+                        setState(() => _todayEarnings += e.value.gain);
+                      },
+                    ),
                   )),
           ],
         ),
@@ -125,8 +148,7 @@ class _MissionsTabState extends State<MissionsTab> {
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22),
           ),
         ),
-        _pill(_online ? 'EN LIGNE' : 'HORS LIGNE',
-            _online ? AppColors.ctaGreen : Colors.grey),
+        _livePill(),
         const SizedBox(width: 6),
         IconButton(
           onPressed: () => _showNotificationsSheet(context),
@@ -147,34 +169,161 @@ class _MissionsTabState extends State<MissionsTab> {
     );
   }
 
+  Widget _livePill() {
+    if (!_online) {
+      return _pill('HORS LIGNE', Colors.grey);
+    }
+    return AnimatedBuilder(
+      animation: _pulseCtrl,
+      builder: (context, _) {
+        final t = _pulseCtrl.value;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.ctaGreen,
+            borderRadius: BorderRadius.circular(100),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.5 + 0.5 * t),
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Text('EN LIGNE',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _onlineToggle() {
     return GestureDetector(
-      onTap: () => setState(() => _online = !_online),
-      child: Container(
-        height: 72,
-        decoration: BoxDecoration(
-          color: _online ? AppColors.ctaGreen : Colors.grey.shade400,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: 18),
-            Icon(_online ? Icons.toggle_on : Icons.toggle_off,
-                color: Colors.white, size: 40),
-            const SizedBox(width: 12),
-            Text(
-              _online ? 'EN LIGNE' : 'HORS LIGNE',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 20,
-                letterSpacing: 1,
-              ),
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        setState(() => _online = !_online);
+      },
+      child: AnimatedBuilder(
+        animation: _pulseCtrl,
+        builder: (context, _) {
+          final glow = _online ? 0.3 + 0.4 * _pulseCtrl.value : 0.0;
+          return Container(
+            height: 84,
+            decoration: BoxDecoration(
+              color:
+                  _online ? const Color(0xFF22C55E) : Colors.grey.shade500,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: _online
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF22C55E)
+                            .withValues(alpha: glow),
+                        blurRadius: 24,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                  : null,
             ),
-          ],
-        ),
+            child: Row(
+              children: [
+                const SizedBox(width: 18),
+                Icon(_online ? Icons.radio_button_checked : Icons.power_settings_new,
+                    color: Colors.white, size: 36),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _online ? 'EN LIGNE' : 'HORS LIGNE',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 20,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      Text(
+                        _online
+                            ? 'Les courses peuvent arriver'
+                            : 'Tape pour passer en ligne',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
+            ),
+          );
+        },
       ),
     );
+  }
+
+  Widget _earningsCard(int value) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("AUJOURD'HUI",
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.6)),
+          const SizedBox(height: 6),
+          TweenAnimationBuilder<int>(
+            tween: IntTween(begin: 0, end: value),
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeOutCubic,
+            builder: (context, v, _) => Text(
+              '${_fmtMoney(v)} FCFA',
+              style: const TextStyle(
+                fontFamily: 'SpaceMono',
+                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _fmtMoney(int v) {
+    final s = v.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
+      buf.write(s[i]);
+    }
+    return buf.toString();
   }
 
   Widget _statCard(String label, String value, {bool isMoney = false}) {
@@ -358,16 +507,56 @@ class _MissionsTabState extends State<MissionsTab> {
 
 class _MissionCard extends StatefulWidget {
   final MissionMock mission;
-  const _MissionCard({required this.mission});
+  final int index;
+  final VoidCallback? onAccepted;
+  const _MissionCard({
+    required this.mission,
+    this.index = 0,
+    this.onAccepted,
+  });
 
   @override
   State<_MissionCard> createState() => _MissionCardState();
 }
 
-class _MissionCardState extends State<_MissionCard> {
+class _MissionCardState extends State<_MissionCard>
+    with TickerProviderStateMixin {
   double _drag = 0;
   static const double _trackHeight = 72;
   static const double _handle = 64;
+
+  late final AnimationController _glowCtrl;
+  late final AnimationController _appearCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _glowCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+    _appearCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+    Future.delayed(Duration(milliseconds: 100 * widget.index), () {
+      if (mounted) _appearCtrl.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _glowCtrl.dispose();
+    _appearCtrl.dispose();
+    super.dispose();
+  }
+
+  String _etaString(int minutes) {
+    final now = DateTime.now().add(Duration(minutes: minutes));
+    final h = now.hour.toString().padLeft(2, '0');
+    final m = now.minute.toString().padLeft(2, '0');
+    return '${h}h$m';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -378,16 +567,42 @@ class _MissionCardState extends State<_MissionCard> {
       _ => ('STANDARD', Colors.grey.shade600),
     };
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x14000000), blurRadius: 10, offset: Offset(0, 3)),
-        ],
-      ),
+    final isExpress = m.type == 'express';
+    return AnimatedBuilder(
+      animation: Listenable.merge([_glowCtrl, _appearCtrl]),
+      builder: (context, child) {
+        final appear = Curves.easeOutCubic.transform(_appearCtrl.value);
+        final glow = isExpress ? 0.25 + 0.45 * _glowCtrl.value : 0.0;
+        return Opacity(
+          opacity: appear,
+          child: Transform.translate(
+            offset: Offset(0, 24 * (1 - appear)),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: isExpress
+                    ? Border.all(color: AppColors.primary, width: 2)
+                    : null,
+                boxShadow: [
+                  const BoxShadow(
+                      color: Color(0x14000000),
+                      blurRadius: 10,
+                      offset: Offset(0, 3)),
+                  if (isExpress)
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: glow),
+                      blurRadius: 22,
+                      spreadRadius: 2,
+                    ),
+                ],
+              ),
+              child: child,
+            ),
+          ),
+        );
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -461,6 +676,22 @@ class _MissionCardState extends State<_MissionCard> {
                       color: AppColors.textPrimary)),
             ],
           ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.access_time_filled,
+                  size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Arrivée estimée : ${_etaString(m.etaMin)}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 14),
           LayoutBuilder(builder: (context, c) {
             final maxDrag = c.maxWidth - _handle - 8;
@@ -472,12 +703,15 @@ class _MissionCardState extends State<_MissionCard> {
               },
               onHorizontalDragEnd: (_) {
                 if (_drag > maxDrag * 0.85) {
+                  HapticFeedback.heavyImpact();
+                  SystemSound.play(SystemSoundType.click);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       backgroundColor: AppColors.ctaGreen,
                       content: Text('Mission acceptée — ${m.restaurant}'),
                     ),
                   );
+                  widget.onAccepted?.call();
                 }
                 setState(() => _drag = 0);
               },
