@@ -1,71 +1,68 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/constants/app_colors.dart';
+import '../courses/data/models/course_model.dart';
+import '../courses/providers/courses_provider.dart';
 
-class MissionMock {
-  final String restaurant;
-  final String type; // express / standard / grouped
-  final int gain;
-  final String pickup;
-  final String dropoff;
-  final double km;
-  final int etaMin;
-  final int groupCount;
-  const MissionMock({
-    required this.restaurant,
-    required this.type,
-    required this.gain,
-    required this.pickup,
-    required this.dropoff,
-    required this.km,
-    required this.etaMin,
-    this.groupCount = 0,
-  });
-}
+// ── Mock fallback ───────────────────────────────────────────────────────────
 
-const _missions = <MissionMock>[
-  MissionMock(
-    restaurant: 'Le Relais de Sawa',
-    type: 'express',
-    gain: 1200,
-    pickup: 'Akwa',
-    dropoff: 'Bonapriso',
-    km: 3.2,
-    etaMin: 18,
+final _mockMissions = [
+  CourseModel(
+    id: 'mock-1',
+    cookName: 'Le Relais de Sawa',
+    cookAddress: 'Akwa',
+    deliveryAddress: 'Bonapriso',
+    totalXaf: 1200,
+    deliveryFeeXaf: 1200,
+    items: const [CourseItemModel(name: 'Ndole Royal', quantity: 1)],
+    createdAt: DateTime.now(),
+    status: 'ready',
+    distanceM: 3200,
+    estimatedMinutes: 18,
   ),
-  MissionMock(
-    restaurant: 'Maison H',
-    type: 'standard',
-    gain: 850,
-    pickup: 'Bonamoussadi',
-    dropoff: 'Kotto',
-    km: 4.8,
-    etaMin: 25,
+  CourseModel(
+    id: 'mock-2',
+    cookName: 'Maison H',
+    cookAddress: 'Bonamoussadi',
+    deliveryAddress: 'Kotto',
+    totalXaf: 850,
+    deliveryFeeXaf: 850,
+    items: const [CourseItemModel(name: 'Poulet DG', quantity: 1)],
+    createdAt: DateTime.now(),
+    status: 'ready',
+    distanceM: 4800,
+    estimatedMinutes: 25,
   ),
-  MissionMock(
-    restaurant: 'Tchop et Yamo',
-    type: 'grouped',
-    gain: 2100,
-    pickup: 'Deido',
-    dropoff: 'Multiple',
-    km: 6.1,
-    etaMin: 30,
-    groupCount: 2,
+  CourseModel(
+    id: 'mock-3',
+    cookName: 'Tchop et Yamo',
+    cookAddress: 'Deido',
+    deliveryAddress: 'Multiple',
+    totalXaf: 2100,
+    deliveryFeeXaf: 2100,
+    items: const [
+      CourseItemModel(name: 'Eru & Waterfufu', quantity: 1),
+      CourseItemModel(name: 'Achu', quantity: 1),
+    ],
+    createdAt: DateTime.now(),
+    status: 'ready',
+    distanceM: 6100,
+    estimatedMinutes: 30,
   ),
 ];
 
-class MissionsTab extends StatefulWidget {
+class MissionsTab extends ConsumerStatefulWidget {
   const MissionsTab({super.key});
 
   @override
-  State<MissionsTab> createState() => _MissionsTabState();
+  ConsumerState<MissionsTab> createState() => _MissionsTabState();
 }
 
-class _MissionsTabState extends State<MissionsTab>
+class _MissionsTabState extends ConsumerState<MissionsTab>
     with TickerProviderStateMixin {
   bool _online = true;
-  int _todayEarnings = 8450;
   late final AnimationController _pulseCtrl;
 
   @override
@@ -85,58 +82,100 @@ class _MissionsTabState extends State<MissionsTab>
 
   @override
   Widget build(BuildContext context) {
+    final apiCourses = ref.watch(availableCoursesProvider);
+    final missions = apiCourses.isEmpty ? _mockMissions : apiCourses;
+    final totalGain =
+        missions.fold<int>(0, (s, c) => s + c.deliveryFeeXaf);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          children: [
-            _header(),
-            const SizedBox(height: 16),
-            _onlineToggle(),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: _earningsCard(_todayEarnings)),
-                const SizedBox(width: 12),
-                Expanded(child: _statCard('MISSIONS', '12')),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'PROXIMITÉ IMMÉDIATE',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 0.8,
+        child: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () =>
+              ref.read(availableCoursesProvider.notifier).refresh(),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            children: [
+              _header(),
+              const SizedBox(height: 16),
+              _onlineToggle(),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _earningsCard(totalGain)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child:
+                          _statCard('MISSIONS', '${missions.length}')),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'PROXIMITE IMMEDIATE',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        letterSpacing: 0.8,
+                      ),
                     ),
                   ),
-                ),
-                _pill('3 NOUVELLES', AppColors.primary),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (!_online)
-              _idleState()
-            else
-              ..._missions.asMap().entries.map((e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: _MissionCard(
-                      mission: e.value,
-                      index: e.key,
-                      onAccepted: () {
-                        setState(() => _todayEarnings += e.value.gain);
-                      },
-                    ),
-                  )),
-          ],
+                  _pill('${missions.length} NOUVELLES', AppColors.primary),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (!_online)
+                _idleState()
+              else
+                ...missions.asMap().entries.map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: _MissionCard(
+                        course: e.value,
+                        index: e.key,
+                        onAccepted: () => _acceptMission(e.value),
+                        onDismissed: () => _dismissMission(e.value),
+                      ),
+                    )),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _acceptMission(CourseModel course) async {
+    try {
+      final accepted =
+          await ref.read(availableCoursesProvider.notifier).accept(course.id);
+      if (!mounted) return;
+      ref.read(activeCourseProvider.notifier).state = accepted;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.ctaGreen,
+          content: Text('Mission acceptee !',
+              style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      // Fallback: still set as active for mock
+      ref.read(activeCourseProvider.notifier).state = course;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.ctaGreen,
+          content: Text('Mission acceptee (mode demo)',
+              style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
+      );
+    }
+  }
+
+  void _dismissMission(CourseModel course) {
+    ref.read(availableCoursesProvider.notifier).dismissCourse(course.id);
   }
 
   Widget _header() {
@@ -170,9 +209,7 @@ class _MissionsTabState extends State<MissionsTab>
   }
 
   Widget _livePill() {
-    if (!_online) {
-      return _pill('HORS LIGNE', Colors.grey);
-    }
+    if (!_online) return _pill('HORS LIGNE', Colors.grey);
     return AnimatedBuilder(
       animation: _pulseCtrl,
       builder: (context, _) {
@@ -237,8 +274,12 @@ class _MissionsTabState extends State<MissionsTab>
             child: Row(
               children: [
                 const SizedBox(width: 18),
-                Icon(_online ? Icons.radio_button_checked : Icons.power_settings_new,
-                    color: Colors.white, size: 36),
+                Icon(
+                    _online
+                        ? Icons.radio_button_checked
+                        : Icons.power_settings_new,
+                    color: Colors.white,
+                    size: 36),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -316,24 +357,17 @@ class _MissionsTabState extends State<MissionsTab>
     );
   }
 
-  static String _fmtMoney(int v) {
-    final s = v.toString();
-    final buf = StringBuffer();
-    for (int i = 0; i < s.length; i++) {
-      if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
-      buf.write(s[i]);
-    }
-    return buf.toString();
-  }
-
-  Widget _statCard(String label, String value, {bool isMoney = false}) {
+  Widget _statCard(String label, String value) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2)),
+          BoxShadow(
+              color: Color(0x14000000),
+              blurRadius: 8,
+              offset: Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -346,15 +380,11 @@ class _MissionsTabState extends State<MissionsTab>
                   color: AppColors.textSecondary,
                   letterSpacing: 0.6)),
           const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: isMoney ? 'SpaceMono' : null,
-              fontWeight: FontWeight.w800,
-              fontSize: isMoney ? 20 : 24,
-              color: isMoney ? AppColors.primary : AppColors.textPrimary,
-            ),
-          ),
+          Text(value,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 24,
+                  color: AppColors.textPrimary)),
         ],
       ),
     );
@@ -367,11 +397,11 @@ class _MissionsTabState extends State<MissionsTab>
         color: bg,
         borderRadius: BorderRadius.circular(100),
       ),
-      child: Text(
-        text,
-        style: const TextStyle(
-            color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
-      ),
+      child: Text(text,
+          style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 11)),
     );
   }
 
@@ -393,12 +423,12 @@ class _MissionsTabState extends State<MissionsTab>
                 const Icon(Icons.notifications_off,
                     size: 56, color: AppColors.textSecondary),
                 const SizedBox(height: 14),
-                const Text('Notifications désactivées',
+                const Text('Notifications desactivees',
                     style:
                         TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
                 const SizedBox(height: 8),
                 const Text(
-                  "Active les notifications pour être alerté dès qu'une course arrive.",
+                  "Active les notifications pour etre alerte des qu'une course arrive.",
                   textAlign: TextAlign.center,
                   style:
                       TextStyle(color: AppColors.textSecondary, fontSize: 14),
@@ -440,7 +470,7 @@ class _MissionsTabState extends State<MissionsTab>
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
               SizedBox(height: 8),
               Text(
-                "Tu seras alerté dès qu'une course arrive !",
+                "Tu seras alerte des qu'une course arrive !",
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
@@ -465,7 +495,8 @@ class _MissionsTabState extends State<MissionsTab>
           ),
           padding: const EdgeInsets.all(18),
           child: ClipOval(
-            child: Image.asset('assets/images/logo_nyama.jpg', fit: BoxFit.cover),
+            child: Image.asset('assets/images/logo_nyama.jpg',
+                fit: BoxFit.cover),
           ),
         ),
         const SizedBox(height: 20),
@@ -478,41 +509,39 @@ class _MissionsTabState extends State<MissionsTab>
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 12),
           child: Text(
-            'Astuce : rapproche-toi des zones chaudes — Akwa, Bonapriso, Deido.',
+            'Astuce : rapproche-toi des zones chaudes - Akwa, Bonapriso, Deido.',
             textAlign: TextAlign.center,
             style: TextStyle(
                 fontSize: 14, color: AppColors.textSecondary, height: 1.4),
           ),
         ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: const Text(
-            'RIDER_IDLE_237',
-            style: TextStyle(
-              fontFamily: 'SpaceMono',
-              color: AppColors.primary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
       ],
     );
   }
+
+  static String _fmtMoney(int v) {
+    final s = v.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
+      buf.write(s[i]);
+    }
+    return buf.toString();
+  }
 }
 
+// ── Mission Card with swipe ─────────────────────────────────────────────────
+
 class _MissionCard extends StatefulWidget {
-  final MissionMock mission;
+  final CourseModel course;
   final int index;
   final VoidCallback? onAccepted;
+  final VoidCallback? onDismissed;
   const _MissionCard({
-    required this.mission,
+    required this.course,
     this.index = 0,
     this.onAccepted,
+    this.onDismissed,
   });
 
   @override
@@ -567,50 +596,26 @@ class _MissionCardState extends State<_MissionCard>
   Future<void> _onAccept(BuildContext context) async {
     if (_accepted) return;
     setState(() => _accepted = true);
-    // Vibration pattern : 3 × heavyImpact avec 100ms d'intervalle
     HapticFeedback.heavyImpact();
     await Future.delayed(const Duration(milliseconds: 100));
     HapticFeedback.heavyImpact();
     await Future.delayed(const Duration(milliseconds: 100));
     HapticFeedback.heavyImpact();
     SystemSound.play(SystemSoundType.click);
-    // Flash vert
     _flashCtrl.forward();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppColors.ctaGreen,
-          content: Text('Mission acceptée !',
-              style: TextStyle(fontWeight: FontWeight.w800)),
-        ),
-      );
-    }
     widget.onAccepted?.call();
-    // Compression + fade
     await Future.delayed(const Duration(milliseconds: 200));
     _acceptCtrl.forward();
   }
 
-  String _etaString(int minutes) {
-    final now = DateTime.now().add(Duration(minutes: minutes));
-    final h = now.hour.toString().padLeft(2, '0');
-    final m = now.minute.toString().padLeft(2, '0');
-    return '${h}h$m';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final m = widget.mission;
-    final typeInfo = switch (m.type) {
-      'express' => ('EXPRESS +500 FCFA', AppColors.primary),
-      'grouped' => ('GROUPÉE (${m.groupCount})', AppColors.ctaGreen),
-      _ => ('STANDARD', Colors.grey.shade600),
-    };
+    final m = widget.course;
+    final isExpress = m.deliveryFeeXaf >= 1000;
 
-    final isExpress = m.type == 'express';
     return AnimatedBuilder(
-      animation: Listenable.merge(
-          [_glowCtrl, _appearCtrl, _acceptCtrl, _flashCtrl]),
+      animation:
+          Listenable.merge([_glowCtrl, _appearCtrl, _acceptCtrl, _flashCtrl]),
       builder: (context, child) {
         final appear = Curves.easeOutCubic.transform(_appearCtrl.value);
         final glow = isExpress ? 0.25 + 0.45 * _glowCtrl.value : 0.0;
@@ -618,8 +623,7 @@ class _MissionCardState extends State<_MissionCard>
         return Opacity(
           opacity: appear * (1 - accept),
           child: Transform.translate(
-            offset: Offset(
-                0, 24 * (1 - appear) + (-80 * accept)),
+            offset: Offset(0, 24 * (1 - appear) + (-80 * accept)),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Stack(
@@ -639,8 +643,7 @@ class _MissionCardState extends State<_MissionCard>
                             offset: Offset(0, 3)),
                         if (isExpress)
                           BoxShadow(
-                            color:
-                                AppColors.primary.withValues(alpha: glow),
+                            color: AppColors.primary.withValues(alpha: glow),
                             blurRadius: 22,
                             spreadRadius: 2,
                           ),
@@ -648,13 +651,12 @@ class _MissionCardState extends State<_MissionCard>
                     ),
                     child: child,
                   ),
-                  // Flash vert à l'acceptation
                   if (_flashCtrl.value > 0)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: Container(
-                          color: AppColors.ctaGreen.withValues(
-                              alpha: 0.3 * (1 - _flashCtrl.value)),
+                          color: AppColors.ctaGreen
+                              .withValues(alpha: 0.3 * (1 - _flashCtrl.value)),
                         ),
                       ),
                     ),
@@ -667,21 +669,22 @@ class _MissionCardState extends State<_MissionCard>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: typeInfo.$2,
-              borderRadius: BorderRadius.circular(6),
+          if (isExpress)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text('EXPRESS',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11)),
             ),
-            child: Text(typeInfo.$1,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 11)),
-          ),
           const SizedBox(height: 10),
           Text(
-            '${_fmt(m.gain)} FCFA',
+            '${_fmt(m.deliveryFeeXaf)} FCFA',
             style: const TextStyle(
               fontFamily: 'SpaceMono',
               fontWeight: FontWeight.w700,
@@ -695,22 +698,21 @@ class _MissionCardState extends State<_MissionCard>
               const Icon(Icons.restaurant, size: 20, color: AppColors.primary),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  m.restaurant,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 18),
-                ),
+                child: Text(m.cookName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 18)),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Row(
             children: [
-              const Icon(Icons.location_on, size: 20, color: AppColors.ctaGreen),
+              const Icon(Icons.location_on,
+                  size: 20, color: AppColors.ctaGreen),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${m.pickup} → ${m.dropoff}',
+                  '${m.cookAddress ?? "Restaurant"} -> ${m.deliveryAddress}',
                   style: const TextStyle(
                       fontSize: 15, color: AppColors.textSecondary),
                 ),
@@ -720,43 +722,30 @@ class _MissionCardState extends State<_MissionCard>
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.route, size: 18, color: AppColors.textSecondary),
+              const Icon(Icons.route,
+                  size: 18, color: AppColors.textSecondary),
               const SizedBox(width: 6),
-              Text('${m.km} km',
+              Text(m.distanceLabel,
                   style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary)),
               const SizedBox(width: 16),
-              const Icon(Icons.schedule, size: 18, color: AppColors.textSecondary),
+              const Icon(Icons.schedule,
+                  size: 18, color: AppColors.textSecondary),
               const SizedBox(width: 6),
-              Text('${m.etaMin} min',
+              Text(m.estimatedLabel,
                   style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary)),
             ],
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.access_time_filled,
-                  size: 16, color: AppColors.primary),
-              const SizedBox(width: 6),
-              Text(
-                'Arrivée estimée : ${_etaString(m.etaMin)}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 14),
           LayoutBuilder(builder: (context, c) {
             final maxDrag = c.maxWidth - _handle - 8;
-            final progress = maxDrag <= 0 ? 0.0 : (_drag / maxDrag).clamp(0.0, 1.0);
+            final progress =
+                maxDrag <= 0 ? 0.0 : (_drag / maxDrag).clamp(0.0, 1.0);
             return GestureDetector(
               onHorizontalDragUpdate: (d) {
                 if (_accepted) return;
@@ -781,7 +770,6 @@ class _MissionCardState extends State<_MissionCard>
                 ),
                 child: Stack(
                   children: [
-                    // Traînée orange derrière la poignée
                     Positioned(
                       left: 0,
                       top: 0,
@@ -798,13 +786,11 @@ class _MissionCardState extends State<_MissionCard>
                     Center(
                       child: Opacity(
                         opacity: (1 - progress * 1.3).clamp(0.0, 1.0),
-                        child: const Text(
-                          'Glisser pour accepter',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16),
-                        ),
+                        child: const Text('Glisser pour accepter',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16)),
                       ),
                     ),
                     Positioned(
@@ -835,12 +821,10 @@ class _MissionCardState extends State<_MissionCard>
           const SizedBox(height: 8),
           Center(
             child: TextButton(
-              onPressed: () {},
-              child: const Text(
-                'Passer',
-                style: TextStyle(
-                    color: AppColors.error, fontWeight: FontWeight.w700),
-              ),
+              onPressed: widget.onDismissed,
+              child: const Text('Passer',
+                  style: TextStyle(
+                      color: AppColors.error, fontWeight: FontWeight.w700)),
             ),
           ),
         ],

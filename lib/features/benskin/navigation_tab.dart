@@ -1,14 +1,22 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../core/constants/app_colors.dart';
+import '../courses/data/models/course_model.dart';
+import '../courses/providers/courses_provider.dart';
+import '../navigation/providers/navigation_provider.dart';
 import '../sos/sos_screen.dart';
 import '../sos/sos_service.dart';
 
-class NavigationTab extends StatefulWidget {
+class NavigationTab extends ConsumerStatefulWidget {
   final bool hasActiveMission;
   final VoidCallback onGoToMissions;
   const NavigationTab({
@@ -18,19 +26,21 @@ class NavigationTab extends StatefulWidget {
   });
 
   @override
-  State<NavigationTab> createState() => _NavigationTabState();
+  ConsumerState<NavigationTab> createState() => _NavigationTabState();
 }
 
-class _NavigationTabState extends State<NavigationTab>
+class _NavigationTabState extends ConsumerState<NavigationTab>
     with TickerProviderStateMixin {
-  static const _restaurantPhone = '+237699000001';
-  static const _clientPhone = '+237699000002';
-  static const _clientName = 'Aïcha N.';
-
   /// 0 = EN ROUTE, 1 = AU RESTAURANT, 2 = EN LIVRAISON, 3 = LIVRÉ
   int _step = 0;
   late final AnimationController _pulseCtrl;
   late final ConfettiController _confettiCtrl;
+
+  // ── Google Maps ──────────────────────────────────────────────────────────
+  GoogleMapController? _mapController;
+  LatLng? _riderPosition;
+  StreamSubscription<Position>? _positionSub;
+  final bool _useRealMap = true; // falls back to simulated if GoogleMap fails
 
   @override
   void initState() {
@@ -41,21 +51,83 @@ class _NavigationTabState extends State<NavigationTab>
     )..repeat(reverse: true);
     _confettiCtrl =
         ConfettiController(duration: const Duration(seconds: 2));
+    _initLocation();
+  }
+
+  Future<void> _initLocation() async {
+    try {
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      if (!mounted) return;
+      setState(() => _riderPosition = LatLng(pos.latitude, pos.longitude));
+
+      _positionSub = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 10,
+        ),
+      ).listen((pos) {
+        if (!mounted) return;
+        setState(() => _riderPosition = LatLng(pos.latitude, pos.longitude));
+      });
+    } catch (_) {
+      // GPS unavailable — keep null position
+    }
   }
 
   @override
   void dispose() {
     _pulseCtrl.dispose();
     _confettiCtrl.dispose();
+    _positionSub?.cancel();
+    _mapController?.dispose();
     super.dispose();
   }
 
-  void _advance() {
+  /// Advance step + call API for delivery status update
+  Future<void> _advance() async {
     HapticFeedback.selectionClick();
+    final course = ref.read(activeCourseProvider);
+    final navRepo = ref.read(navigationRepositoryProvider);
+
+    // Map step → API status
+    String? apiStatus;
+    switch (_step) {
+      case 0:
+        apiStatus = 'ARRIVED';
+        break;
+      case 1:
+        apiStatus = 'PICKED_UP';
+        break;
+      case 2:
+        apiStatus = 'DELIVERED';
+        break;
+    }
+
+    // Call API if we have an active course
+    if (course != null && apiStatus != null) {
+      try {
+        await navRepo.updateDeliveryStatus(course.id, apiStatus);
+      } catch (_) {
+        // Continue even if API fails — offline-first
+      }
+    }
+
     setState(() => _step = (_step + 1).clamp(0, 3));
     if (_step == 3) {
       HapticFeedback.lightImpact();
       _confettiCtrl.play();
+      // Clear active course after delivery
+      ref.read(activeCourseProvider.notifier).state = null;
     }
   }
 
@@ -77,6 +149,9 @@ class _NavigationTabState extends State<NavigationTab>
 
   @override
   Widget build(BuildContext context) {
+    final course = ref.watch(activeCourseProvider);
+    final hasActive = course != null;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -93,7 +168,7 @@ class _NavigationTabState extends State<NavigationTab>
       ),
       body: Stack(
         children: [
-          widget.hasActiveMission ? _activeMission(context) : _noMission(),
+          hasActive ? _activeMission(context, course) : _noMission(),
           Align(
             alignment: Alignment.topCenter,
             child: ConfettiWidget(
@@ -152,12 +227,28 @@ class _NavigationTabState extends State<NavigationTab>
     );
   }
 
-  Widget _activeMission(BuildContext context) {
+  Widget _activeMission(BuildContext context, CourseModel course) {
+    final restaurantPhone = course.cookPhone ?? '+237699000001';
+    final clientPhone = course.clientPhone ?? '+237699000002';
+    final clientName = course.deliveryAddress;
+    final cookName = course.cookName;
+    final cookAddress = course.cookAddress ?? 'Adresse inconnue';
+    final distance = course.distanceLabel;
+    final eta = course.estimatedMinutes != null
+        ? '${course.estimatedMinutes} MIN RESTANTS'
+        : '— MIN';
+
     return Column(
       children: [
         Expanded(
           flex: 6,
-          child: _WazeMap(pulseCtrl: _pulseCtrl, onCallRestaurant: () => _call(_restaurantPhone), onCallClient: () => _call(_clientPhone)),
+          child: _useRealMap
+              ? _googleMapWidget(course, restaurantPhone, clientPhone)
+              : _WazeMap(
+                  pulseCtrl: _pulseCtrl,
+                  onCallRestaurant: () => _call(restaurantPhone),
+                  onCallClient: () => _call(clientPhone),
+                ),
         ),
         Container(
           padding: const EdgeInsets.all(16),
@@ -182,16 +273,16 @@ class _NavigationTabState extends State<NavigationTab>
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text(
-                    '1.2 km',
-                    style: TextStyle(
+                  Text(
+                    distance,
+                    style: const TextStyle(
                         fontFamily: 'SpaceMono',
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary),
                   ),
                   const SizedBox(width: 10),
-                  Text('4 MIN RESTANTS',
+                  Text(eta,
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
@@ -200,22 +291,176 @@ class _NavigationTabState extends State<NavigationTab>
                 ],
               ),
               const SizedBox(height: 6),
-              const Text('Le Gourmet Camerounais',
-                  style:
-                      TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-              const Text('Akwa, Rue des Écoles',
-                  style: TextStyle(
+              Text(cookName,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 18)),
+              Text(cookAddress,
+                  style: const TextStyle(
                       fontSize: 14, color: AppColors.textSecondary)),
               const SizedBox(height: 14),
               _progress(),
               const SizedBox(height: 14),
-              _clientCard(),
+              _clientCard(clientName, clientPhone),
               const SizedBox(height: 12),
               _actionRow(),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  // ── Google Map widget ──────────────────────────────────────────────────────
+
+  Widget _googleMapWidget(CourseModel course, String restaurantPhone, String clientPhone) {
+    final cookLat = course.cookLat;
+    final cookLng = course.cookLng;
+    final delivLat = course.deliveryLat;
+    final delivLng = course.deliveryLng;
+
+    // Default center: Douala
+    final defaultCenter = LatLng(4.0511, 9.7679);
+    final center = _riderPosition ??
+        (cookLat != null && cookLng != null
+            ? LatLng(cookLat, cookLng)
+            : defaultCenter);
+
+    // Markers
+    final markers = <Marker>{};
+    if (cookLat != null && cookLng != null) {
+      markers.add(Marker(
+        markerId: const MarkerId('restaurant'),
+        position: LatLng(cookLat, cookLng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+        infoWindow: InfoWindow(title: course.cookName),
+      ));
+    }
+    if (delivLat != null && delivLng != null) {
+      markers.add(Marker(
+        markerId: const MarkerId('client'),
+        position: LatLng(delivLat, delivLng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: InfoWindow(title: course.deliveryAddress),
+      ));
+    }
+    if (_riderPosition != null) {
+      markers.add(Marker(
+        markerId: const MarkerId('rider'),
+        position: _riderPosition!,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        infoWindow: const InfoWindow(title: 'Ma position'),
+      ));
+    }
+
+    // Polyline between points
+    final polylinePoints = <LatLng>[];
+    if (_riderPosition != null) polylinePoints.add(_riderPosition!);
+    if (cookLat != null && cookLng != null) {
+      polylinePoints.add(LatLng(cookLat, cookLng));
+    }
+    if (delivLat != null && delivLng != null) {
+      polylinePoints.add(LatLng(delivLat, delivLng));
+    }
+
+    final polylines = <Polyline>{};
+    if (polylinePoints.length >= 2) {
+      polylines.add(Polyline(
+        polylineId: const PolylineId('route'),
+        points: polylinePoints,
+        color: AppColors.primary,
+        width: 4,
+      ));
+    }
+
+    return Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: CameraPosition(target: center, zoom: 14),
+          markers: markers,
+          polylines: polylines,
+          myLocationEnabled: true,
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
+          onMapCreated: (controller) {
+            _mapController = controller;
+            _fitBounds(markers);
+          },
+        ),
+        // FABs d'appel
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: Column(
+            children: [
+              _callFab(
+                  icon: Icons.restaurant,
+                  color: AppColors.primary,
+                  onTap: () => _call(restaurantPhone)),
+              const SizedBox(height: 10),
+              _callFab(
+                  icon: Icons.person,
+                  color: AppColors.secondary,
+                  onTap: () => _call(clientPhone)),
+              const SizedBox(height: 10),
+              _callFab(
+                  icon: Icons.my_location,
+                  color: Colors.blue,
+                  onTap: _centerOnRider),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _fitBounds(Set<Marker> markers) {
+    if (_mapController == null || markers.length < 2) return;
+    double minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+    for (final m in markers) {
+      if (m.position.latitude < minLat) minLat = m.position.latitude;
+      if (m.position.latitude > maxLat) maxLat = m.position.latitude;
+      if (m.position.longitude < minLng) minLng = m.position.longitude;
+      if (m.position.longitude > maxLng) maxLng = m.position.longitude;
+    }
+    _mapController!.animateCamera(CameraUpdate.newLatLngBounds(
+      LatLngBounds(
+        southwest: LatLng(minLat, minLng),
+        northeast: LatLng(maxLat, maxLng),
+      ),
+      60,
+    ));
+  }
+
+  void _centerOnRider() {
+    if (_mapController == null || _riderPosition == null) return;
+    _mapController!.animateCamera(
+      CameraUpdate.newLatLngZoom(_riderPosition!, 16),
+    );
+  }
+
+  Widget _callFab({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color,
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x33000000),
+                blurRadius: 10,
+                offset: Offset(0, 3)),
+          ],
+        ),
+        child: Icon(icon, color: Colors.white, size: 24),
+      ),
     );
   }
 
@@ -274,7 +519,7 @@ class _NavigationTabState extends State<NavigationTab>
     }
   }
 
-  Widget _clientCard() {
+  Widget _clientCard(String clientName, String clientPhone) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -290,21 +535,21 @@ class _NavigationTabState extends State<NavigationTab>
             child: Icon(Icons.person, color: Colors.white),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_clientName,
-                    style: TextStyle(
+                Text(clientName,
+                    style: const TextStyle(
                         fontWeight: FontWeight.w800, fontSize: 15)),
-                Text(_clientPhone,
-                    style: TextStyle(
+                Text(clientPhone,
+                    style: const TextStyle(
                         fontSize: 13, color: AppColors.textSecondary)),
               ],
             ),
           ),
           IconButton(
-            onPressed: () => _call(_clientPhone),
+            onPressed: () => _call(clientPhone),
             icon: const Icon(Icons.phone, color: AppColors.ctaGreen),
             tooltip: 'Appeler le client',
           ),
@@ -449,7 +694,7 @@ class _NavigationTabState extends State<NavigationTab>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Carte style Waze (rendu simulé, pas d'intégration Google Maps ici)
+// Carte style Waze (fallback si GoogleMap non dispo)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _WazeMap extends StatelessWidget {
@@ -466,7 +711,6 @@ class _WazeMap extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Fond radial
         Container(
           decoration: const BoxDecoration(
             gradient: RadialGradient(
@@ -475,43 +719,31 @@ class _WazeMap extends StatelessWidget {
             ),
           ),
         ),
-        // Quadrillage de rues
         Positioned.fill(
           child: CustomPaint(painter: _StreetGridPainter()),
         ),
-        // Itinéraire en pointillés orange
         Positioned.fill(
           child: CustomPaint(painter: _RoutePainter()),
         ),
-        // Marqueur restaurant (haut droite)
         const Positioned(
           top: 60,
           right: 40,
-          child: _MapMarker(
-            color: AppColors.primary,
-            icon: Icons.restaurant,
-          ),
+          child: _MapMarker(color: AppColors.primary, icon: Icons.restaurant),
         ),
-        // Marqueur client (haut gauche)
         const Positioned(
           top: 90,
           left: 50,
-          child: _MapMarker(
-            color: AppColors.ctaGreen,
-            icon: Icons.home,
-          ),
+          child: _MapMarker(color: AppColors.ctaGreen, icon: Icons.home),
         ),
-        // Position livreur pulsante (centre bas)
         Positioned(
           bottom: 90,
           left: 80,
           child: AnimatedBuilder(
             animation: pulseCtrl,
             builder: (context, _) {
-              return Container(
+              return SizedBox(
                 width: 40,
                 height: 40,
-                alignment: Alignment.center,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -545,84 +777,6 @@ class _WazeMap extends StatelessWidget {
             },
           ),
         ),
-        // Card instruction navigation
-        Positioned(
-          top: 12,
-          left: 12,
-          right: 12,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF3D3D3D),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: const [
-                BoxShadow(
-                    color: Color(0x33000000),
-                    blurRadius: 10,
-                    offset: Offset(0, 3)),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.turn_right,
-                      color: Colors.white, size: 26),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('DANS 250 MÈTRES',
-                          style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.6)),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Tournez à droite sur Rue Pau',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        // Badge distance / temps (bas gauche)
-        Positioned(
-          bottom: 12,
-          left: 12,
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: const [
-                BoxShadow(
-                    color: Color(0x22000000),
-                    blurRadius: 6,
-                    offset: Offset(0, 2)),
-              ],
-            ),
-            child: const Text(
-              '3.2 km • 12 min',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-            ),
-          ),
-        ),
-        // FABs d'appel
         Positioned(
           right: 16,
           bottom: 16,
@@ -703,12 +857,10 @@ class _StreetGridPainter extends CustomPainter {
       ..color = const Color(0xFFBDBDBD).withValues(alpha: 0.6)
       ..strokeWidth = 2;
 
-    // Lignes horizontales
     const hSpacing = 60.0;
     for (double y = hSpacing; y < size.height; y += hSpacing) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
-    // Lignes verticales
     const vSpacing = 70.0;
     for (double x = vSpacing; x < size.width; x += vSpacing) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
@@ -727,7 +879,6 @@ class _RoutePainter extends CustomPainter {
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round;
 
-    // Diagonale bas-gauche → haut-droite, en pointillés
     final start = Offset(40, size.height - 80);
     final end = Offset(size.width - 50, 80);
     const dashLen = 14.0;

@@ -1,18 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
+import '../earnings/providers/earnings_provider.dart';
+import '../earnings/data/models/earnings_model.dart';
 
-class RevenueTab extends StatefulWidget {
+class RevenueTab extends ConsumerStatefulWidget {
   const RevenueTab({super.key});
 
   @override
-  State<RevenueTab> createState() => _RevenueTabState();
+  ConsumerState<RevenueTab> createState() => _RevenueTabState();
 }
 
-class _RevenueTabState extends State<RevenueTab> {
+class _RevenueTabState extends ConsumerState<RevenueTab> {
   int _selectedDay = 4;
+
+  // ── Mock fallback data ──────────────────────────────────────────────────
+  static const _mockTotal = 45800;
+  static const _mockCount = 6;
+  static final _mockBreakdown = <_MockCourse>[
+    _MockCourse('Poulet DG Royal', '14:45', 'Bastos', 'Akwa', 1250),
+    _MockCourse('Ndolé Crevettes', '12:30', 'Bonapriso', 'Bali', 2100),
+    _MockCourse('Eru & Waterfufu', '11:15', 'Deido', 'Bonamoussadi', 950),
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final period = ref.watch(selectedPeriodProvider);
+    final earningsAsync = ref.watch(earningsProvider(period));
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -31,48 +46,113 @@ class _RevenueTabState extends State<RevenueTab> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-        children: [
-          _balanceCard(),
-          const SizedBox(height: 14),
-          _dailyGoalCard(6, 10),
-          const SizedBox(height: 14),
-          _performanceCard(),
-          const SizedBox(height: 20),
-          const Text('Courses du jour',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-          const SizedBox(height: 10),
-          _courseTile('Poulet DG Royal', '14:45', 'Bastos', 'Akwa', 1250),
-          _courseTile('Ndolé Crevettes', '12:30', 'Bonapriso', 'Bali', 2100),
-          _courseTile('Eru & Waterfufu', '11:15', 'Deido', 'Bonamoussadi', 950),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 72,
-            child: ElevatedButton.icon(
-              onPressed: () => _showTransferSheet(context),
-              icon: const Icon(Icons.swap_horiz, color: Colors.white, size: 28),
-              label: const Text(
-                'Transférer vers MoMo/OM',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.ctaGreen,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-              ),
+      body: earningsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => _buildBody(
+          total: _mockTotal,
+          count: _mockCount,
+          breakdown: null,
+        ),
+        data: (earnings) => _buildBody(
+          total: earnings.total > 0 ? earnings.total : _mockTotal,
+          count: earnings.count > 0 ? earnings.count : _mockCount,
+          breakdown: earnings.breakdown.isNotEmpty ? earnings.breakdown : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody({
+    required int total,
+    required int count,
+    List<EarningEntry>? breakdown,
+  }) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      children: [
+        _balanceCard(total),
+        const SizedBox(height: 14),
+        _dailyGoalCard(count, 10),
+        const SizedBox(height: 14),
+        _performanceCard(),
+        const SizedBox(height: 20),
+        const Text('Courses du jour',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+        const SizedBox(height: 10),
+        if (breakdown != null)
+          ...breakdown.map((e) => _earningEntryTile(e))
+        else
+          ..._mockBreakdown.map((m) =>
+              _courseTile(m.name, m.time, m.from, m.to, m.gain)),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          height: 72,
+          child: ElevatedButton.icon(
+            onPressed: () => _showTransferSheet(context),
+            icon: const Icon(Icons.swap_horiz, color: Colors.white, size: 28),
+            label: const Text(
+              'Transférer vers MoMo/OM',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18),
             ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.ctaGreen,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _earningEntryTile(EarningEntry entry) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0F000000), blurRadius: 6, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Livraison',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text(entry.timeLabel,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+          Text(
+            '${_fmt(entry.netXaf)} FCFA',
+            style: const TextStyle(
+                fontFamily: 'SpaceMono',
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: AppColors.primary),
           ),
         ],
       ),
     );
   }
 
-  Widget _balanceCard() {
+  Widget _balanceCard(int total) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -93,9 +173,9 @@ class _RevenueTabState extends State<RevenueTab> {
                   color: AppColors.textSecondary,
                   letterSpacing: 0.8)),
           const SizedBox(height: 8),
-          const Text(
-            '45 800 FCFA',
-            style: TextStyle(
+          Text(
+            '${_fmt(total)} FCFA',
+            style: const TextStyle(
                 fontFamily: 'SpaceMono',
                 fontWeight: FontWeight.w700,
                 fontSize: 36,
@@ -180,7 +260,7 @@ class _RevenueTabState extends State<RevenueTab> {
                 const SizedBox(height: 2),
                 Text(
                   done >= goal
-                      ? 'Objectif atteint ! 🎉'
+                      ? 'Objectif atteint !'
                       : 'Encore ${goal - done} pour viser le bonus',
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.textSecondary),
@@ -309,7 +389,8 @@ class _RevenueTabState extends State<RevenueTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
-          BoxShadow(color: Color(0x0F000000), blurRadius: 6, offset: Offset(0, 2)),
+          BoxShadow(
+              color: Color(0x0F000000), blurRadius: 6, offset: Offset(0, 2)),
         ],
       ),
       child: Row(
@@ -511,4 +592,10 @@ class _RevenueTabState extends State<RevenueTab> {
       },
     );
   }
+}
+
+class _MockCourse {
+  final String name, time, from, to;
+  final int gain;
+  const _MockCourse(this.name, this.time, this.from, this.to, this.gain);
 }

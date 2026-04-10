@@ -1,21 +1,34 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
+import '../courses/data/models/course_model.dart';
+import '../earnings/providers/earnings_provider.dart';
 import 'vehicle_settings_sheet.dart';
 
-class ProfileTab extends StatefulWidget {
+class ProfileTab extends ConsumerStatefulWidget {
   const ProfileTab({super.key});
 
   @override
-  State<ProfileTab> createState() => _ProfileTabState();
+  ConsumerState<ProfileTab> createState() => _ProfileTabState();
 }
 
-class _ProfileTabState extends State<ProfileTab> {
+class _ProfileTabState extends ConsumerState<ProfileTab> {
   File? _avatar;
+
+  // ── Mock fallback ────────────────────────────────────────────────────────
+  static const _mockProfile = RiderProfileModel(
+    userId: 'mock',
+    name: 'Kevin',
+    vehicleType: 'Honda CB 125',
+    plateNumber: 'LT-452-XY',
+    avgRating: 4.9,
+    totalTrips: 156,
+  );
 
   Future<void> _pickAvatar() async {
     try {
@@ -30,7 +43,7 @@ class _ProfileTabState extends State<ProfileTab> {
       if (x != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('$label enregistré ✓'),
+              content: Text('$label enregistré'),
               backgroundColor: AppColors.ctaGreen),
         );
       }
@@ -45,6 +58,8 @@ class _ProfileTabState extends State<ProfileTab> {
 
   @override
   Widget build(BuildContext context) {
+    final profileAsync = ref.watch(riderProfileProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -64,248 +79,272 @@ class _ProfileTabState extends State<ProfileTab> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-        children: [
-          Center(
-            child: Column(
-              children: [
-                GestureDetector(
-                  onTap: _pickAvatar,
-                  child: Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.gold, width: 2),
-                        ),
-                        padding: const EdgeInsets.all(3),
-                        child: ClipOval(
-                          child: _avatar != null
-                              ? Image.file(_avatar!, fit: BoxFit.cover)
-                              : Image.asset('assets/images/logo_nyama.jpg',
-                                  fit: BoxFit.cover),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primary,
-                        ),
-                        child: const Icon(Icons.camera_alt,
-                            color: Colors.white, size: 16),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.gold,
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: const Text('Livreur Confirmé',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12)),
-                ),
-                const SizedBox(height: 12),
-                const Text('Kevin',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w800, fontSize: 28)),
-                const Text('Membre depuis Janvier 2023',
-                    style: TextStyle(
-                        fontSize: 12, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: const [
-              Expanded(child: _StatCard(label: 'COURSES', value: '156')),
-              SizedBox(width: 10),
-              Expanded(child: _StatCard(label: 'NOTE', value: '4.9')),
-              SizedBox(width: 10),
-              Expanded(child: _StatCard(label: 'SUCCÈS', value: '98%')),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const Text('Statistiques de la semaine',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(
-                    color: Color(0x14000000),
-                    blurRadius: 8,
-                    offset: Offset(0, 2)),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: const [
-                _Gauge(
-                  value: 0.95,
-                  label: 'Acceptation',
-                  display: '95%',
-                  color: AppColors.ctaGreen,
-                ),
-                _Gauge(
-                  value: 0.73,
-                  label: 'Temps moyen',
-                  display: '22 min',
-                  color: AppColors.primary,
-                ),
-                _Gauge(
-                  value: 0.98,
-                  label: 'Satisfaction',
-                  display: '4.9/5',
-                  color: AppColors.gold,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text('Véhicule de service',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(
-                    color: Color(0x14000000),
-                    blurRadius: 8,
-                    offset: Offset(0, 2)),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.two_wheeler,
-                      color: AppColors.primary, size: 28),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Honda CB 125',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w800, fontSize: 17)),
-                      SizedBox(height: 4),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text('LT-452-XY',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 12)),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.ctaGreen,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text('Assuré',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _scanDocument('Permis'),
-                  icon: const Icon(Icons.document_scanner,
-                      color: AppColors.primary),
-                  label: const Text('Permis',
-                      style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _scanDocument('Assurance'),
-                  icon: const Icon(Icons.document_scanner,
-                      color: AppColors.primary),
-                  label: const Text('Assurance',
-                      style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _menuItem(Icons.person_add, 'Inviter un ami livreur', _inviteFriend),
-          _menuItem(Icons.history, 'Historique complet',
-              () => _snack(context, 'Historique bientôt disponible')),
-          _menuItem(Icons.two_wheeler, 'Paramètres du véhicule',
-              () => showVehicleSettingsSheet(context)),
-          _menuItem(Icons.help_outline, 'Aide & Support', () async {
-            final uri = Uri.parse('https://wa.me/237699000000');
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            }
-          }),
-          _menuItem(Icons.logout, 'Déconnexion', () {
-            context.go('/phone');
-          }, danger: true),
-          const SizedBox(height: 20),
-          const Center(
-            child: Text('Version 1.0 • Benskin Express',
-                style:
-                    TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-          ),
-        ],
+      body: profileAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => _buildProfile(_mockProfile),
+        data: (profile) => _buildProfile(
+          profile.userId.isNotEmpty ? profile : _mockProfile,
+        ),
       ),
+    );
+  }
+
+  Widget _buildProfile(RiderProfileModel profile) {
+    final name = profile.name ?? 'Kevin';
+    final totalTrips = profile.totalTrips > 0 ? profile.totalTrips : 156;
+    final avgRating = profile.avgRating > 0 ? profile.avgRating : 4.9;
+    final vehicleType = profile.vehicleType ?? 'Honda CB 125';
+    final plateNumber = profile.plateNumber ?? 'LT-452-XY';
+    final successRate = avgRating >= 4.5 ? 98 : (avgRating * 20).round();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      children: [
+        Center(
+          child: Column(
+            children: [
+              GestureDetector(
+                onTap: _pickAvatar,
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.gold, width: 2),
+                      ),
+                      padding: const EdgeInsets.all(3),
+                      child: ClipOval(
+                        child: _avatar != null
+                            ? Image.file(_avatar!, fit: BoxFit.cover)
+                            : Image.asset('assets/images/logo_nyama.jpg',
+                                fit: BoxFit.cover),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.primary,
+                      ),
+                      child: const Icon(Icons.camera_alt,
+                          color: Colors.white, size: 16),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.gold,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: const Text('Livreur Confirmé',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12)),
+              ),
+              const SizedBox(height: 12),
+              Text(name,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 28)),
+              const Text('Membre depuis Janvier 2023',
+                  style: TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+                child:
+                    _StatCard(label: 'COURSES', value: '$totalTrips')),
+            const SizedBox(width: 10),
+            Expanded(
+                child: _StatCard(
+                    label: 'NOTE',
+                    value: avgRating.toStringAsFixed(1))),
+            const SizedBox(width: 10),
+            Expanded(
+                child:
+                    _StatCard(label: 'SUCCÈS', value: '$successRate%')),
+          ],
+        ),
+        const SizedBox(height: 20),
+        const Text('Statistiques de la semaine',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2)),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _Gauge(
+                value: 0.95,
+                label: 'Acceptation',
+                display: '95%',
+                color: AppColors.ctaGreen,
+              ),
+              _Gauge(
+                value: 0.73,
+                label: 'Temps moyen',
+                display: '22 min',
+                color: AppColors.primary,
+              ),
+              _Gauge(
+                value: avgRating / 5.0,
+                label: 'Satisfaction',
+                display: '${avgRating.toStringAsFixed(1)}/5',
+                color: AppColors.gold,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text('Véhicule de service',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2)),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.two_wheeler,
+                    color: AppColors.primary, size: 28),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(vehicleType,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 17)),
+                    const SizedBox(height: 4),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(plateNumber,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 12)),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.ctaGreen,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('Assuré',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _scanDocument('Permis'),
+                icon: const Icon(Icons.document_scanner,
+                    color: AppColors.primary),
+                label: const Text('Permis',
+                    style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _scanDocument('Assurance'),
+                icon: const Icon(Icons.document_scanner,
+                    color: AppColors.primary),
+                label: const Text('Assurance',
+                    style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _menuItem(Icons.person_add, 'Inviter un ami livreur', _inviteFriend),
+        _menuItem(Icons.history, 'Historique complet',
+            () => _snack(context, 'Historique bientôt disponible')),
+        _menuItem(Icons.two_wheeler, 'Paramètres du véhicule',
+            () => showVehicleSettingsSheet(context)),
+        _menuItem(Icons.help_outline, 'Aide & Support', () async {
+          final uri = Uri.parse('https://wa.me/237699000000');
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        }),
+        _menuItem(Icons.logout, 'Déconnexion', () {
+          context.go('/phone');
+        }, danger: true),
+        const SizedBox(height: 20),
+        const Center(
+          child: Text('Version 1.0 • Benskin Express',
+              style:
+                  TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        ),
+      ],
     );
   }
 
